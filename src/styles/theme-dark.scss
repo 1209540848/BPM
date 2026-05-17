@@ -1,0 +1,57 @@
+/**
+ * 暗黑模式 CSS 规则
+ *
+ * 原理：当 <html class="dark"> 存在时，这些样式被激活
+ * 由于 CSS 级联，这里的变量定义会覆盖 :root 中的定义
+ */
+
+html.dark {
+  /* 暗黑模式的背景和文字颜色 */
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+
+  /* 页面背景 */
+  body {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+  }
+
+  /* 链接颜色适配暗黑 */
+  a {
+    color: var(--primary-light-3);
+  }
+
+  a:hover {
+    color: var(--primary-light-1);
+  }
+
+  /* 按钮适配暗黑 */
+  button {
+    background-color: var(--primary-color);
+  }
+
+  button:hover {
+    background-color: var(--primary-light-1);
+  }
+
+  /* 输入框 */
+  input,
+  textarea,
+  select {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+  }
+
+  /* 自定义组件样式 */
+  .custom-card {
+    background-color: #1f1f1f;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+  }
+
+  .container {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+  }
+}
