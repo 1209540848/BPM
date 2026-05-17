@@ -5,6 +5,8 @@ import {
   THEME_KEY,
   type ThemeConfig,
   applyTheme,
+  getThemeConfig,
+  saveThemeConfig,
 } from '../theme'
 
 export const useThemeStore = defineStore('theme', () => {

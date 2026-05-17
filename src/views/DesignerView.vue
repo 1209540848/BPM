@@ -1,16 +1,23 @@
-﻿<template>
+<template>
   <MainLayout>
     <div class="designer-page">
-      <a-row :gutter="16" class="designer-layout">
-        <a-col :span="6" class="designer-sidebar">
-          <a-card title="流程列表" :bordered="false" style="margin-bottom: 16px">
-            <a-button type="primary" block @click="showCreateModal">新建流程</a-button>
+      <a-row :gutter="16">
+        <a-col :span="6">
+          <a-card title="流程列表" :bordered="false" style="margin-bottom: 16px;">
+            <a-space direction="vertical" style="width: 100%">
+              <a-button type="primary" block @click="showCreateModal">
+                新建流程
+              </a-button>
+            </a-space>
           </a-card>
-          <a-card :bordered="false" class="definition-card">
-            <a-list :data-source="processStore.definitions" item-layout="horizontal">
+          <a-card :bordered="false">
+            <a-list
+              :data-source="processStore.definitions"
+              item-layout="horizontal"
+            >
               <template #renderItem="{ item }">
                 <a-list-item @click="selectDefinition(item.id)">
-                  <a-list-item-meta :title="item.name" :description="item.description || '暂无描述'" />
+                  <a-list-item-meta :title="item.name" :description="item.description" />
                   <a-tag :color="item.status === 'published' ? 'green' : 'orange'">
                     {{ item.status === 'published' ? '已发布' : '草稿' }}
                   </a-tag>
@@ -19,18 +26,17 @@
             </a-list>
           </a-card>
         </a-col>
-
-        <a-col :span="18" class="designer-main">
-          <a-card v-if="processStore.currentDefinition" :bordered="false" class="workspace-card">
+        <a-col :span="18">
+          <a-card v-if="processStore.currentDefinition" :bordered="false">
             <template #title>
               <a-space>
                 <span>{{ processStore.currentDefinition.name }}</span>
                 <a-tag :color="processStore.currentDefinition.status === 'published' ? 'green' : 'orange'">
                   {{ processStore.currentDefinition.status === 'published' ? '已发布' : '草稿' }}
                 </a-tag>
-                <a-button
-                  v-if="processStore.currentDefinition.status === 'draft'"
-                  type="primary"
+                <a-button 
+                  v-if="processStore.currentDefinition.status === 'draft'" 
+                  type="primary" 
                   size="small"
                   @click="handlePublish"
                 >
@@ -38,18 +44,7 @@
                 </a-button>
               </a-space>
             </template>
-
-            <a-tabs v-model:activeKey="activeTab" class="designer-tabs">
-              <a-tab-pane key="flow" tab="流程设计">
-                <ProcessDesigner />
-              </a-tab-pane>
-              <a-tab-pane key="form" tab="表单配置">
-                <DynamicFormDesigner
-                  :definition-id="processStore.currentDefinition.id"
-                  :fields="processStore.currentDefinition.formFields || []"
-                />
-              </a-tab-pane>
-            </a-tabs>
+            <ProcessDesigner />
           </a-card>
           <a-empty v-else description="请先选择或创建一个流程" />
         </a-col>
@@ -74,13 +69,14 @@ import { ref, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
 import MainLayout from '../components/layout/MainLayout.vue';
 import ProcessDesigner from '../components/designer/ProcessDesigner.vue';
-import DynamicFormDesigner from '../components/form/DynamicFormDesigner.vue';
 import { useProcessStore } from '../stores/process';
 
 const processStore = useProcessStore();
 const createModalVisible = ref(false);
-const activeTab = ref('flow');
-const createForm = ref({ name: '', description: '' });
+const createForm = ref({
+  name: '',
+  description: '',
+});
 
 onMounted(() => {
   processStore.fetchDefinitions();
@@ -107,7 +103,9 @@ async function handleCreate() {
 }
 
 async function handlePublish() {
-  if (!processStore.currentDefinition) return;
+  if (!processStore.currentDefinition) {
+    return;
+  }
   try {
     await processStore.publishDefinition(processStore.currentDefinition.id);
     await processStore.fetchDefinitions();
@@ -119,68 +117,19 @@ async function handlePublish() {
 
 function selectDefinition(id: string) {
   processStore.setCurrentDefinition(id);
-  activeTab.value = 'flow';
 }
 </script>
 
 <style scoped>
-.designer-page,
-.designer-layout,
-.designer-main,
-.workspace-card,
-.designer-tabs {
-  min-height: calc(100vh - 136px);
-}
-
-.designer-page :deep(.workspace-card > .ant-card-body) {
-  min-height: calc(100vh - 196px);
-}
-
-.designer-page :deep(.designer-tabs .ant-tabs-content),
-.designer-page :deep(.designer-tabs .ant-tabs-tabpane) {
-  min-height: calc(100vh - 270px);
+.designer-page {
+  height: calc(100vh - 136px);
 }
 
 .designer-page :deep(.ant-list-item) {
   cursor: pointer;
-  color: rgba(0, 0, 0, 0.88);
-  border-radius: 8px;
-  padding: 10px 12px;
-  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.designer-page :deep(.ant-list-item:hover),
-.designer-page :deep(.ant-list-item:hover .ant-list-item-meta),
-.designer-page :deep(.ant-list-item:hover .ant-list-item-meta-content) {
-  background: #f5f7fb !important;
-}
-
-.designer-page :deep(.ant-list-item:hover .ant-list-item-meta-title),
-.designer-page :deep(.ant-list-item:hover .ant-list-item-meta-description) {
-  color: rgba(0, 0, 0, 0.88) !important;
-}
-
-:global(html.dark) .designer-page :deep(.ant-list-item) {
-  color: rgba(255, 255, 255, 0.88);
-}
-
-:global(html.dark) .designer-page :deep(.ant-list-item:hover),
-:global(html.dark) .designer-page :deep(.ant-list-item:hover .ant-list-item-meta),
-:global(html.dark) .designer-page :deep(.ant-list-item:hover .ant-list-item-meta-content) {
-  background: #1f2937 !important;
-}
-
-:global(html.dark) .designer-page :deep(.ant-list-item-meta-title),
-:global(html.dark) .designer-page :deep(.ant-list-item-meta-description),
-:global(html.dark) .designer-page :deep(.ant-list-item:hover .ant-list-item-meta-title),
-:global(html.dark) .designer-page :deep(.ant-list-item:hover .ant-list-item-meta-description) {
-  color: rgba(255, 255, 255, 0.88) !important;
-}
-
-:global(html.dark) .designer-page :deep(.ant-card),
-:global(html.dark) .designer-page :deep(.ant-card-body),
-:global(html.dark) .designer-page :deep(.ant-list) {
-  background: #111827;
-  color: rgba(255, 255, 255, 0.88);
+.designer-page :deep(.ant-list-item:hover) {
+  background: #f5f5f5;
 }
 </style>

@@ -1,19 +1,19 @@
 <template>
   <div class="notification-container">
-    <a-dropdown v-model:open="dropdownVisible" trigger="click">
+    <a-dropdown v-model:open="dropdownVisible">
       <a-badge :count="unreadCount" :dot="unreadCount > 0">
         <a-button type="text" class="notification-button" @click="handleDropdownClick">
           <BellOutlined />
         </a-button>
       </a-badge>
       <template #overlay>
-        <a-menu class="notification-menu">
+        <a-menu style="width: 360px; max-height: 400px; overflow-y: auto;">
           <a-menu-item-group title="通知中心">
             <a-menu-item v-if="notifications.length === 0" disabled>
-              <span class="empty-text">暂无通知</span>
+              <span style="color: #999;">暂无通知</span>
             </a-menu-item>
-            <a-menu-item
-              v-for="notification in notifications"
+            <a-menu-item 
+              v-for="notification in notifications" 
               :key="notification.id"
               @click="markAsRead(notification.id)"
             >
@@ -26,7 +26,7 @@
           </a-menu-item-group>
           <a-menu-divider v-if="notifications.length > 0" />
           <a-menu-item v-if="notifications.length > 0" @click="clearAll">
-            <span class="clear-text">清空所有通知</span>
+            <span style="color: #ff4d4f;">清空所有通知</span>
           </a-menu-item>
         </a-menu>
       </template>
@@ -44,14 +44,13 @@ const { notifications, clearAll, markAsRead, addNotification } = useNotification
 const { getWebSocketClient } = useWebSocket();
 const dropdownVisible = ref(false);
 
-const unreadCount = computed(() => notifications.value.filter((item) => !item.read).length);
+const unreadCount = computed(() => {
+  return notifications.value.filter(n => !n.read).length;
+});
 
-const formatTime = (timestamp: number) => new Date(timestamp).toLocaleString('zh-CN');
-
-const markAllAsRead = () => {
-  notifications.value.forEach((notification) => {
-    notification.read = true;
-  });
+const formatTime = (timestamp: number) => {
+  const date = new Date(timestamp);
+  return date.toLocaleString('zh-CN');
 };
 
 const handleDropdownClick = () => {
@@ -61,7 +60,15 @@ const handleDropdownClick = () => {
   dropdownVisible.value = !dropdownVisible.value;
 };
 
+const markAllAsRead = () => {
+  notifications.value.forEach(n => {
+    n.read = true;
+  });
+};
+
 const handleWebSocketMessage = (message: WebSocketMessage) => {
+  console.log('收到 WebSocket 消息:', message);
+  
   switch (message.type) {
     case 'info':
       addNotification({
@@ -83,12 +90,9 @@ const handleWebSocketMessage = (message: WebSocketMessage) => {
       addNotification({
         type: message.data.result === 'approved' ? 'success' : 'error',
         title: message.data.result === 'approved' ? '任务已通过' : '任务已驳回',
-        message:
-          message.data.result === 'approved'
-            ? `任务 ${message.data.taskId} 已通过审批`
-            : `任务 ${message.data.taskId} 已被驳回${
-                message.data.comment ? `，原因：${message.data.comment}` : ''
-              }`,
+        message: message.data.result === 'approved' 
+          ? `任务 ${message.data.taskId} 已通过审批`
+          : `任务 ${message.data.taskId} 已被驳回${message.data.comment ? `，原因：${message.data.comment}` : ''}`,
         timestamp: message.timestamp,
       });
       break;
@@ -114,11 +118,15 @@ const handleWebSocketMessage = (message: WebSocketMessage) => {
 onMounted(() => {
   try {
     const wsClient = getWebSocketClient();
+    
+    // 注册消息监听器
     wsClient.on('info', handleWebSocketMessage);
     wsClient.on('task_assigned', handleWebSocketMessage);
     wsClient.on('task_result', handleWebSocketMessage);
     wsClient.on('process_update', handleWebSocketMessage);
     wsClient.on('timeout_warning', handleWebSocketMessage);
+    
+    console.log('WebSocket 消息监听器已注册');
   } catch (error) {
     console.error('WebSocket 初始化错误:', error);
   }
@@ -140,98 +148,46 @@ onUnmounted(() => {
 
 <style scoped>
 .notification-container {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 32px;
-  vertical-align: middle;
-}
-
-.notification-container :deep(.ant-badge) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 32px;
-  line-height: 1;
+  display: inline-block;
 }
 
 .notification-button {
   font-size: 18px;
-  padding: 0 !important;
-  color: #1677ff !important;
-  background: rgba(22, 119, 255, 0.1) !important;
-  border: none !important;
-  box-shadow: none !important;
+  padding: 4px 8px;
+  /* 亮色模式：使用主题色 */
+  color: var(--primary-color);
   transition: all 0.2s;
-  border-radius: 50%;
+  border-radius: 4px;
   min-width: 32px;
-  width: 32px;
   height: 32px;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  line-height: 32px;
-  vertical-align: middle;
-  transform: translateY(0);
 }
 
 .notification-button:hover {
-  background: rgba(22, 119, 255, 0.16) !important;
-  color: #002c8c !important;
-  border: none !important;
-  box-shadow: none !important;
+  background-color: var(--primary-light-7);
+  color: var(--primary-dark-2);
 }
 
 .notification-button :deep(svg) {
-  width: 18px;
-  height: 18px;
-  display: block;
-  color: currentColor !important;
-  fill: currentColor !important;
-  stroke: currentColor !important;
-  opacity: 1;
+  stroke: currentColor;
+  fill: none;
+  color: currentColor;
 }
 
-.notification-button :deep(path) {
-  fill: currentColor !important;
-  stroke: currentColor !important;
-}
-
+/* 暗黑模式下使用亮色 */
 :global(html.dark) .notification-button {
-  color: #91caff !important;
-  background: rgba(145, 202, 255, 0.16) !important;
-  border: none !important;
-  box-shadow: none !important;
+  color: var(--primary-light-3);
 }
 
 :global(html.dark) .notification-button:hover {
-  background: rgba(145, 202, 255, 0.24) !important;
-  color: #ffffff !important;
-  border: none !important;
-  box-shadow: none !important;
+  background-color: var(--primary-dark-6);
+  color: var(--primary-light-1);
 }
 
 :global(html.dark) .notification-button :deep(svg) {
-  color: currentColor !important;
-}
-
-:global(html.dark) .notification-button :deep(path) {
-  fill: currentColor !important;
-  stroke: currentColor !important;
-}
-
-.notification-menu {
-  width: 360px;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.empty-text {
-  color: #999;
-}
-
-.clear-text {
-  color: #ff4d4f;
+  color: var(--primary-light-3);
 }
 
 .notification-item {

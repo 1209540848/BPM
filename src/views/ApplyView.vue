@@ -1,9 +1,9 @@
-﻿<template>
+<template>
   <MainLayout>
     <div class="apply-container">
       <a-card title="发起申请" :bordered="false">
-        <a-form ref="formRef" :model="formState" layout="vertical">
-          <a-form-item label="选择流程" name="definitionId" :rules="[{ required: true, message: '请选择流程' }]">
+        <a-form :model="formState" layout="vertical">
+          <a-form-item label="选择流程">
             <a-select
               v-model:value="formState.definitionId"
               placeholder="请选择流程"
@@ -19,22 +19,51 @@
             </a-select>
           </a-form-item>
 
-          <a-form-item label="业务编号">
-            <a-input v-model:value="formState.businessKey" placeholder="请输入业务编号，例如 PO-2026-001" />
+          <a-form-item label="业务键">
+            <a-input
+              v-model:value="formState.businessKey"
+              placeholder="请输入业务键（可选）"
+            />
           </a-form-item>
 
           <template v-if="selectedDefinition">
-            <a-divider orientation="left">申请信息</a-divider>
-            <DynamicFormRenderer
-              ref="dynamicFormRef"
-              :fields="selectedDefinition.formFields || []"
-              v-model="formState.variables"
-            />
+            <a-divider>申请信息</a-divider>
+
+            <a-form-item
+              v-for="field in formFields"
+              :key="field.name"
+              :label="field.label"
+            >
+              <a-input
+                v-if="field.type === 'text'"
+                v-model:value="formState.variables[field.name]"
+                :placeholder="field.placeholder"
+              />
+              <a-input-number
+                v-else-if="field.type === 'number'"
+                v-model:value="formState.variables[field.name]"
+                :placeholder="field.placeholder"
+                style="width: 100%"
+              />
+              <a-date-picker
+                v-else-if="field.type === 'date'"
+                v-model:value="formState.variables[field.name]"
+                style="width: 100%"
+              />
+              <a-textarea
+                v-else-if="field.type === 'textarea'"
+                v-model:value="formState.variables[field.name]"
+                :placeholder="field.placeholder"
+                :rows="4"
+              />
+            </a-form-item>
           </template>
 
           <a-form-item>
             <a-space>
-              <a-button type="primary" :loading="loading" @click="handleSubmit">提交申请</a-button>
+              <a-button type="primary" @click="handleSubmit" :loading="loading">
+                提交申请
+              </a-button>
               <a-button @click="handleReset">重置</a-button>
             </a-space>
           </a-form-item>
@@ -47,17 +76,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
-import type { FormInstance } from 'ant-design-vue';
 import MainLayout from '../components/layout/MainLayout.vue';
-import DynamicFormRenderer from '../components/form/DynamicFormRenderer.vue';
 import { useProcessStore } from '../stores/process';
 import { useInstanceStore } from '../stores/instance';
 
 const processStore = useProcessStore();
 const instanceStore = useInstanceStore();
-const formRef = ref<FormInstance>();
-const dynamicFormRef = ref<InstanceType<typeof DynamicFormRenderer>>();
-const loading = ref(false);
 
 const formState = ref({
   definitionId: undefined as string | undefined,
@@ -65,34 +89,64 @@ const formState = ref({
   variables: {} as Record<string, any>,
 });
 
-const publishedDefinitions = computed(() => processStore.definitions.filter(d => d.status === 'published'));
-const selectedDefinition = computed(() => processStore.definitions.find(d => d.id === formState.value.definitionId));
+const loading = ref(false);
 
-function handleDefinitionChange() {
-  const defaults: Record<string, any> = {};
-  selectedDefinition.value?.formFields?.forEach((field) => {
-    if (field.defaultValue !== undefined) {
-      defaults[field.key] = field.defaultValue;
-    }
-  });
-  formState.value.variables = defaults;
-}
+const publishedDefinitions = computed(() => {
+  return processStore.definitions.filter(d => d.status === 'published');
+});
 
-async function handleSubmit() {
+const selectedDefinition = computed(() => {
+  return processStore.definitions.find(d => d.id === formState.value.definitionId);
+});
+
+const formFields = computed(() => {
+  if (!selectedDefinition.value) return [];
+
+  const fields: any[] = [];
+
+  if (selectedDefinition.value.nodes.some(n => 
+    n.conditions?.some(c => c.field === 'amount')
+  )) {
+    fields.push({
+      name: 'amount',
+      label: '金额',
+      type: 'number',
+      placeholder: '请输入金额',
+    });
+  }
+
+  if (selectedDefinition.value.nodes.some(n => 
+    n.conditions?.some(c => c.field === 'days')
+  )) {
+    fields.push({
+      name: 'days',
+      label: '天数',
+      type: 'number',
+      placeholder: '请输入天数',
+    });
+  }
+
+  if (selectedDefinition.value.nodes.some(n => 
+    n.conditions?.some(c => c.field === 'reason')
+  )) {
+    fields.push({
+      name: 'reason',
+      label: '申请原因',
+      type: 'textarea',
+      placeholder: '请输入申请原因',
+    });
+  }
+
+  return fields;
+});
+
+const handleDefinitionChange = () => {
+  formState.value.variables = {};
+};
+
+const handleSubmit = async () => {
   if (!formState.value.definitionId) {
     message.error('请选择流程');
-    return;
-  }
-
-  try {
-    await formRef.value?.validate();
-  } catch {
-    return;
-  }
-
-  const dynamicValidateResult = dynamicFormRef.value?.validate();
-  if (dynamicValidateResult && !dynamicValidateResult.valid) {
-    message.error(dynamicValidateResult.errors[0] || '请完善申请信息');
     return;
   }
 
@@ -103,6 +157,7 @@ async function handleSubmit() {
       formState.value.businessKey || undefined,
       formState.value.variables
     );
+
     message.success('申请提交成功');
     handleReset();
   } catch (error: any) {
@@ -110,16 +165,15 @@ async function handleSubmit() {
   } finally {
     loading.value = false;
   }
-}
+};
 
-function handleReset() {
+const handleReset = () => {
   formState.value = {
     definitionId: undefined,
     businessKey: '',
     variables: {},
   };
-  formRef.value?.clearValidate();
-}
+};
 
 onMounted(() => {
   processStore.fetchDefinitions();
@@ -129,5 +183,7 @@ onMounted(() => {
 <style scoped>
 .apply-container {
   padding: 24px;
+  max-width: 800px;
+  margin: 0 auto;
 }
 </style>

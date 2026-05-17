@@ -3,7 +3,7 @@
  * 作用：把混合算法的结果转换为 CSS 变量对象
  */
 
-import { generateColorLevels } from './colorAlgorithm'
+import { generateColorLevels, type ColorLevel } from './colorAlgorithm'
 
 /**
  * 完整的主题 CSS 变量集合

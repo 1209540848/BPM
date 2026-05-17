@@ -4,7 +4,6 @@ import * as processController from '../controllers/process.controller';
 import * as instanceController from '../controllers/instance.controller';
 import * as taskController from '../controllers/task.controller';
 import * as testController from '../controllers/test.controller';
-import * as demoTemplateController from '../controllers/demo-template.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = new Router({ prefix: '/api/v1' });
@@ -30,8 +29,5 @@ router.post('/tasks/:id/reject', authMiddleware, taskController.rejectTask);
 router.post('/tasks/:id/delegate', authMiddleware, taskController.delegateTask);
 
 router.post('/test/notification', authMiddleware, testController.sendTestNotification);
-
-router.post('/demo/templates/rebuild', authMiddleware, demoTemplateController.rebuildDemoTemplates);
-router.get('/demo/templates/verify', authMiddleware, demoTemplateController.verifyDemoTemplates);
 
 export default router;

@@ -35,11 +35,11 @@
       <a-layout-header style="background: #fff; padding: 0 24px; border-bottom: 1px solid #f0f0f0;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span style="font-size: 16px; font-weight: 500;">{{ pageTitle }}</span>
-          <a-space class="header-actions">
+          <a-space>
             <NotificationCenter />
             <ThemeSwitcher />
             <a-dropdown v-if="authStore.user">
-              <a-space class="user-trigger">
+              <a-space style="cursor: pointer;">
                 <a-avatar style="background-color: #1890ff;">
                   {{ authStore.user.username?.charAt(0)?.toUpperCase() || 'U' }}
                 </a-avatar>
@@ -120,23 +120,5 @@ function handleLogout() {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.header-actions {
-  display: inline-flex;
-  align-items: center;
-  height: 32px;
-}
-
-.header-actions :deep(.ant-space-item) {
-  display: inline-flex;
-  align-items: center;
-}
-
-.user-trigger {
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  cursor: pointer;
 }
 </style>

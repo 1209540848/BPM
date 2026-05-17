@@ -1,8 +1,7 @@
 import prisma from '../config/database.config';
 import { Task, PaginationParams, PaginationResult } from '../types';
+import * as processService from './process.service';
 import { getWebSocketService } from './websocket.service';
-import { getNodeName, getOutgoingTargets, parseJsonArray, parseJsonObject } from './process-engine.service';
-import { resolveAssignee } from './assignee-resolver.service';
 
 export const getTasks = async (
   params: PaginationParams & { assignee?: string }
@@ -108,7 +107,7 @@ export const completeTask = async (
     },
   });
 
-  await continueProcess(task.instanceId, variables);
+  await continueProcess(task.instanceId);
 
   // 发送任务审批结果通知
   try {
@@ -235,7 +234,7 @@ export const delegateTask = async (
   return updatedTask;
 };
 
-const continueProcess = async (instanceId: string, newVariables: Record<string, any> = {}): Promise<void> => {
+const continueProcess = async (instanceId: string): Promise<void> => {
   const instance = await prisma.processInstance.findUnique({
     where: { id: instanceId },
     include: {
@@ -252,20 +251,22 @@ const continueProcess = async (instanceId: string, newVariables: Record<string, 
     : instance.definition.definition as any;
   const nodes = definitionData?.nodes || [];
   const edges = definitionData?.edges || [];
-  const variables = {
-    ...parseJsonObject(instance.variables),
-    ...newVariables,
-  };
 
   const currentNodeIds = typeof instance.currentNodeIds === 'string' 
     ? JSON.parse(instance.currentNodeIds) 
     : instance.currentNodeIds;
+  const executedNodes = [...currentNodeIds];
+
   const nextNodeIds: string[] = [];
 
   for (const nodeId of currentNodeIds) {
-    const sourceNode = nodes.find((n: any) => n.id === nodeId);
-    if (!sourceNode) continue;
-    nextNodeIds.push(...getOutgoingTargets(sourceNode, edges, variables));
+    const outgoingEdges = edges.filter((edge: any) => edge.source === nodeId);
+    for (const edge of outgoingEdges) {
+      const targetNode = nodes.find((n: any) => n.id === edge.target);
+      if (targetNode && !executedNodes.includes(edge.target)) {
+        nextNodeIds.push(edge.target);
+      }
+    }
   }
 
   if (nextNodeIds.length === 0) {
@@ -280,15 +281,8 @@ const continueProcess = async (instanceId: string, newVariables: Record<string, 
     return;
   }
 
-  const waitingNodeIds: string[] = [];
-  const queue = [...new Set(nextNodeIds)];
-  const visited = new Set<string>();
-
-  while (queue.length > 0) {
-    const nodeId = queue.shift()!;
-    if (visited.has(nodeId)) continue;
-    visited.add(nodeId);
-
+  const newNodeIds: string[] = [];
+  for (const nodeId of nextNodeIds) {
     const node = nodes.find((n: any) => n.id === nodeId);
     if (!node) {
       continue;
@@ -298,16 +292,16 @@ const continueProcess = async (instanceId: string, newVariables: Record<string, 
       data: {
         instanceId,
         nodeId: node.id,
-        nodeName: getNodeName(node),
+        nodeName: node.label || node.id,
         type: node.type,
         timestamp: new Date(),
       },
     });
 
     if (node.type === 'userTask') {
-      const candidateUsers = node.data?.candidateUsers || node.candidateUsers || [];
-      const candidateGroups = node.data?.candidateGroups || node.candidateGroups || [];
-      let assignee = await resolveAssignee(node, instance.startedBy);
+      const candidateUsers = node.data?.candidateUsers || [];
+      const candidateGroups = node.data?.candidateGroups || [];
+      let assignee = node.data?.assignee || instance.startedBy;
 
       // 防止申请人审批自己的申请
       if (assignee === instance.startedBy && candidateUsers.length === 0) {
@@ -322,20 +316,19 @@ const continueProcess = async (instanceId: string, newVariables: Record<string, 
           instanceId,
           definitionId: instance.definitionId,
           nodeId: node.id,
-          nodeName: getNodeName(node),
+          nodeName: node.label || node.id,
           status: 'pending',
           assignee,
           candidateUsers: JSON.stringify(candidateUsers),
           candidateGroups: JSON.stringify(candidateGroups),
-          variables: JSON.stringify(variables),
         },
       });
-      waitingNodeIds.push(node.id);
+      newNodeIds.push(node.id);
 
       // 发送任务分配通知
       try {
         const wsService = getWebSocketService();
-        wsService.sendTaskAssigned(assignee, node.id, getNodeName(node), instanceId);
+        wsService.sendTaskAssigned(assignee, node.id, node.label || node.id, instanceId);
       } catch (error) {
         console.error('WebSocket send error:', error);
       }
@@ -349,39 +342,13 @@ const continueProcess = async (instanceId: string, newVariables: Record<string, 
         },
       });
       return;
-    } else {
-      queue.push(...getOutgoingTargets(node, edges, variables));
     }
-  }
-
-  const pendingTasks = await prisma.task.findMany({
-    where: {
-      instanceId,
-      status: 'pending',
-    },
-  });
-
-  const pendingNodeIds = pendingTasks.map((task) => task.nodeId);
-  const activeNodeIds = [...new Set([...waitingNodeIds, ...pendingNodeIds])];
-
-  if (activeNodeIds.length === 0) {
-    await prisma.processInstance.update({
-      where: { id: instanceId },
-      data: {
-        status: 'completed',
-        endedAt: new Date(),
-        currentNodeIds: JSON.stringify([]),
-        variables: JSON.stringify(variables),
-      },
-    });
-    return;
   }
 
   await prisma.processInstance.update({
     where: { id: instanceId },
     data: {
-      currentNodeIds: JSON.stringify(activeNodeIds),
-      variables: JSON.stringify(variables),
+      currentNodeIds: JSON.stringify(newNodeIds),
     },
   });
 };

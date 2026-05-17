@@ -27,9 +27,9 @@
                   <a-avatar :style="{ backgroundColor: getRandomColor(index) }">
                     {{ index + 1 }}
                   </a-avatar>
-                  <div class="list-item-content">
-                    <div class="list-item-title">{{ item.name }}</div>
-                    <div class="list-item-desc">
+                  <div>
+                    <div style="font-weight: 500;">{{ item.name }}</div>
+                    <div style="font-size: 12px; color: rgba(0, 0, 0, 0.45);">
                       {{ item.description }} - {{ item.date || '' }}
                     </div>
                   </div>
@@ -103,39 +103,9 @@ function getRandomColor(index: number): string {
   border-bottom: 1px solid #f0f0f0;
   display: flex;
   align-items: center;
-  color: rgba(0, 0, 0, 0.88);
-  border-radius: 6px;
-  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .list-item:hover {
-  background-color: #f5f7fb;
-}
-
-.list-item-title {
-  font-weight: 600;
-  color: rgba(0, 0, 0, 0.88);
-}
-
-.list-item-desc {
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.55);
-}
-
-:global(html.dark) .list-item {
-  border-bottom-color: #303030;
-  color: rgba(255, 255, 255, 0.88);
-}
-
-:global(html.dark) .list-item:hover {
-  background-color: #1f2937;
-}
-
-:global(html.dark) .list-item-title {
-  color: rgba(255, 255, 255, 0.92);
-}
-
-:global(html.dark) .list-item-desc {
-  color: rgba(255, 255, 255, 0.62);
+  background-color: #f5f5f5;
 }
 </style>

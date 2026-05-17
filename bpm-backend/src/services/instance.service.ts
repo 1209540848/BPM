@@ -2,8 +2,6 @@ import prisma from '../config/database.config';
 import { ProcessInstance, PaginationParams, PaginationResult } from '../types';
 import * as processService from './process.service';
 import * as taskService from './task.service';
-import { getNodeName, getOutgoingTargets, parseJsonObject } from './process-engine.service';
-import { resolveAssignee } from './assignee-resolver.service';
 
 export const getInstances = async (
   params: PaginationParams & { definitionId?: string }
@@ -134,7 +132,6 @@ const executeProcess = async (
     : definition.definition;
   const nodes = definitionData.nodes || [];
   const edges = definitionData.edges || [];
-  const processVariables = parseJsonObject((await prisma.processInstance.findUnique({ where: { id: instanceId } }))?.variables);
 
   const startNode = nodes.find((node: any) => node.type === 'start');
   if (!startNode) {
@@ -143,7 +140,6 @@ const executeProcess = async (
 
   let currentNodeIds: string[] = [startNode.id];
   const executedNodes: string[] = [];
-  const waitingNodeIds: string[] = [];
 
   while (currentNodeIds.length > 0) {
     const nodeId = currentNodeIds.shift()!;
@@ -163,7 +159,7 @@ const executeProcess = async (
       data: {
         instanceId,
         nodeId: node.id,
-        nodeName: getNodeName(node),
+        nodeName: node.label || node.id,
         type: node.type,
         timestamp: new Date(),
       },
@@ -172,14 +168,14 @@ const executeProcess = async (
     if (node.type === 'userTask') {
       const candidateUsers = node.data?.candidateUsers || [];
       const candidateGroups = node.data?.candidateGroups || [];
-      const assignee = await resolveAssignee(node, startedBy);
+      const assignee = node.data?.assignee || startedBy;
 
       await prisma.task.create({
         data: {
           instanceId,
           definitionId: definition.id,
           nodeId: node.id,
-          nodeName: getNodeName(node),
+          nodeName: node.label || node.id,
           status: 'pending',
           assignee,
           candidateUsers: JSON.stringify(candidateUsers),
@@ -187,21 +183,20 @@ const executeProcess = async (
         },
       });
 
-      waitingNodeIds.push(node.id);
-      continue;
+      await prisma.processInstance.update({
+        where: { id: instanceId },
+        data: {
+          currentNodeIds: JSON.stringify([...currentNodeIds, ...executedNodes.filter((id) => !currentNodeIds.includes(id))]),
+        },
+      });
+
+      return;
     }
 
-    currentNodeIds.push(...getOutgoingTargets(node, edges, processVariables));
-  }
-
-  if (waitingNodeIds.length > 0) {
-    await prisma.processInstance.update({
-      where: { id: instanceId },
-      data: {
-        currentNodeIds: JSON.stringify(waitingNodeIds),
-      },
-    });
-    return;
+    const outgoingEdges = edges.filter((edge: any) => edge.source === nodeId);
+    for (const edge of outgoingEdges) {
+      currentNodeIds.push(edge.target);
+    }
   }
 
   await prisma.processInstance.update({
