@@ -1,8 +1,8 @@
-# BPM 系统 - 业务流程管理系统
+# OA无纸化办公流程系统
 
 ## 项目概述
 
-基于 Vue3 + TypeScript + Ant Design Vue + AntV X6 + Koa + Prisma 构建的企业级业务流程管理系统，支持流程可视化设计、自动化任务分配、跨部门协作审批等核心功能。
+基于 Vue3 + TypeScript + Ant Design Vue + AntV X6 + Koa + Prisma 构建的无纸化办公流程系统，支持流程可视化设计、自动化任务分配、跨部门协作审批等核心功能。
 
 ## 技术栈
 
