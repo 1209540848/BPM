@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { ProcessDefinition, NodeData, EdgeData } from '../types';
+import type { ProcessDefinition, NodeData, EdgeData, DynamicFormField } from '../types';
 import { NodeType, ProcessStatus } from '../types';
 import { nanoid } from 'nanoid';
 import { processApi } from '../api';
@@ -18,24 +18,27 @@ export const useProcessStore = defineStore('process', () => {
     definitions.value.filter(d => d.status === 'draft')
   );
 
+  function parseDefinitionPayload(item: any): ProcessDefinition {
+    const definitionData = typeof item.definition === 'string'
+      ? JSON.parse(item.definition || '{}')
+      : item.definition || {};
+
+    return {
+      ...item,
+      definition: definitionData,
+      nodes: definitionData.nodes || [],
+      edges: definitionData.edges || [],
+      formFields: definitionData.formFields || [],
+      createdAt: new Date(item.createdAt).getTime(),
+      updatedAt: new Date(item.updatedAt).getTime(),
+    };
+  }
+
   async function fetchDefinitions(params?: { page?: number; pageSize?: number; status?: string }) {
     loading.value = true;
     try {
       const data: any = await processApi.getDefinitions(params);
-      definitions.value = data.list.map((item: any) => ({
-        ...item,
-        definition: typeof item.definition === 'string' 
-          ? JSON.parse(item.definition) 
-          : item.definition,
-        nodes: typeof item.definition === 'string' 
-          ? JSON.parse(item.definition).nodes || [] 
-          : item.definition?.nodes || [],
-        edges: typeof item.definition === 'string' 
-          ? JSON.parse(item.definition).edges || [] 
-          : item.definition?.edges || [],
-        createdAt: new Date(item.createdAt).getTime(),
-        updatedAt: new Date(item.updatedAt).getTime(),
-      }));
+      definitions.value = data.list.map(parseDefinitionPayload);
     } finally {
       loading.value = false;
     }
@@ -66,6 +69,7 @@ export const useProcessStore = defineStore('process', () => {
         },
       ],
       edges: [],
+      formFields: [],
       createdAt: now,
       updatedAt: now,
       createdBy: 'admin',
@@ -77,23 +81,11 @@ export const useProcessStore = defineStore('process', () => {
       definition: {
         nodes: definition.nodes,
         edges: definition.edges,
+        formFields: definition.formFields,
       },
     });
     
-    const parsedResult: ProcessDefinition = {
-      ...result,
-      definition: typeof result.definition === 'string' 
-        ? JSON.parse(result.definition) 
-        : result.definition,
-      nodes: typeof result.definition === 'string' 
-        ? JSON.parse(result.definition).nodes || [] 
-        : result.definition?.nodes || [],
-      edges: typeof result.definition === 'string' 
-        ? JSON.parse(result.definition).edges || [] 
-        : result.definition?.edges || [],
-      createdAt: new Date(result.createdAt).getTime(),
-      updatedAt: new Date(result.updatedAt).getTime(),
-    };
+    const parsedResult = parseDefinitionPayload(result);
     
     definitions.value.push(parsedResult);
     currentDefinition.value = parsedResult;
@@ -110,6 +102,7 @@ export const useProcessStore = defineStore('process', () => {
     
     const updatedNodes = nodes || current.nodes;
     const updatedEdges = edges || current.edges;
+    const formFields = current.formFields || [];
     
     const result: any = await processApi.updateDefinition(id, {
       name: current.name,
@@ -117,23 +110,11 @@ export const useProcessStore = defineStore('process', () => {
       definition: {
         nodes: updatedNodes,
         edges: updatedEdges,
+        formFields,
       },
     });
     
-    const parsedResult: ProcessDefinition = {
-      ...result,
-      definition: typeof result.definition === 'string' 
-        ? JSON.parse(result.definition) 
-        : result.definition,
-      nodes: typeof result.definition === 'string' 
-        ? JSON.parse(result.definition).nodes || [] 
-        : result.definition?.nodes || [],
-      edges: typeof result.definition === 'string' 
-        ? JSON.parse(result.definition).edges || [] 
-        : result.definition?.edges || [],
-      createdAt: new Date(result.createdAt).getTime(),
-      updatedAt: new Date(result.updatedAt).getTime(),
-    };
+    const parsedResult = parseDefinitionPayload(result);
     
     definitions.value[index] = parsedResult;
     if (currentDefinition.value?.id === id) {
@@ -157,23 +138,11 @@ export const useProcessStore = defineStore('process', () => {
         definition: {
           nodes: updated.nodes,
           edges: updated.edges,
+          formFields: updated.formFields || [],
         },
       });
       
-      const parsedResult: ProcessDefinition = {
-        ...result,
-        definition: typeof result.definition === 'string' 
-          ? JSON.parse(result.definition) 
-          : result.definition,
-        nodes: typeof result.definition === 'string' 
-          ? JSON.parse(result.definition).nodes || [] 
-          : result.definition?.nodes || [],
-        edges: typeof result.definition === 'string' 
-          ? JSON.parse(result.definition).edges || [] 
-          : result.definition?.edges || [],
-        createdAt: new Date(result.createdAt).getTime(),
-        updatedAt: new Date(result.updatedAt).getTime(),
-      };
+      const parsedResult = parseDefinitionPayload(result);
       
       definitions.value[index] = parsedResult;
       if (currentDefinition.value?.id === id) {
@@ -184,6 +153,19 @@ export const useProcessStore = defineStore('process', () => {
 
   async function updateNodesAndEdges(id: string, nodes: NodeData[], edges: EdgeData[]) {
     await updateDefinitionData(id, nodes, edges);
+  }
+
+  async function updateFormFields(id: string, formFields: DynamicFormField[]) {
+    const index = definitions.value.findIndex(d => d.id === id);
+    if (index === -1) return;
+
+    const current = definitions.value[index];
+    if (!current) return;
+
+    await updateDefinition(id, {
+      ...current,
+      formFields,
+    });
   }
 
   async function updateNodes(id: string, nodes: NodeData[]) {
@@ -208,20 +190,7 @@ export const useProcessStore = defineStore('process', () => {
 
   async function publishDefinition(id: string) {
     const result: any = await processApi.publishDefinition(id);
-    const parsedResult: ProcessDefinition = {
-      ...result,
-      definition: typeof result.definition === 'string' 
-        ? JSON.parse(result.definition) 
-        : result.definition,
-      nodes: typeof result.definition === 'string' 
-        ? JSON.parse(result.definition).nodes || [] 
-        : result.definition?.nodes || [],
-      edges: typeof result.definition === 'string' 
-        ? JSON.parse(result.definition).edges || [] 
-        : result.definition?.edges || [],
-      createdAt: new Date(result.createdAt).getTime(),
-      updatedAt: new Date(result.updatedAt).getTime(),
-    };
+    const parsedResult = parseDefinitionPayload(result);
     const index = definitions.value.findIndex(d => d.id === id);
     if (index !== -1) {
       definitions.value[index] = parsedResult;
@@ -259,6 +228,7 @@ export const useProcessStore = defineStore('process', () => {
     updateNodes,
     updateEdges,
     updateNodesAndEdges,
+    updateFormFields,
     publishDefinition,
     deleteDefinition,
     setCurrentDefinition,

@@ -6,6 +6,9 @@ export const authApi = {
   
   register: (data: { username: string; email: string; password: string; fullName?: string }) => 
     request.post('/auth/register', data),
+
+  me: () =>
+    request.get('/auth/me'),
 };
 
 export const processApi = {

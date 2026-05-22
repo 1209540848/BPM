@@ -5,28 +5,28 @@
         <h2 style="color: white; padding: 16px; margin: 0; font-size: 18px;">yuan BPM</h2>
       </div>
       <a-menu v-model:selectedKeys="selectedKeys" theme="dark" mode="inline">
-        <a-menu-item key="/dashboard" @click="navigate('/dashboard')">
+        <a-menu-item v-if="authStore.can('oa:dashboard:view')" key="/dashboard" @click="navigate('/dashboard')">
           <span>数据看板</span>
         </a-menu-item>
-        <a-menu-item key="/designer" @click="navigate('/designer')">
+        <a-menu-item v-if="authStore.can('oa:process:write')" key="/designer" @click="navigate('/designer')">
           <span>流程设计器</span>
         </a-menu-item>
-        <a-menu-item key="/apply" @click="navigate('/apply')">
+        <a-menu-item v-if="authStore.can('oa:instance:start')" key="/apply" @click="navigate('/apply')">
           <span>发起申请</span>
         </a-menu-item>
-        <a-menu-item key="/my-applications" @click="navigate('/my-applications')">
+        <a-menu-item v-if="authStore.can('oa:instance:read')" key="/my-applications" @click="navigate('/my-applications')">
           <span>我的申请</span>
         </a-menu-item>
-        <a-menu-item key="/instances" @click="navigate('/instances')">
+        <a-menu-item v-if="authStore.can('oa:instance:read')" key="/instances" @click="navigate('/instances')">
           <span>流程实例</span>
         </a-menu-item>
-        <a-menu-item key="/tasks" @click="navigate('/tasks')">
+        <a-menu-item v-if="authStore.can('oa:task:read')" key="/tasks" @click="navigate('/tasks')">
           <span>任务中心</span>
         </a-menu-item>
-        <a-menu-item key="/virtual-list-demo" @click="navigate('/virtual-list-demo')">
+        <a-menu-item v-if="authStore.can('oa:dashboard:view')" key="/virtual-list-demo" @click="navigate('/virtual-list-demo')">
           <span>虚拟列表演示</span>
         </a-menu-item>
-        <a-menu-item key="/simple-test" @click="navigate('/simple-test')">
+        <a-menu-item v-if="authStore.can('oa:dashboard:view')" key="/simple-test" @click="navigate('/simple-test')">
           <span>通知测试</span>
         </a-menu-item>
       </a-menu>
@@ -35,11 +35,11 @@
       <a-layout-header style="background: #fff; padding: 0 24px; border-bottom: 1px solid #f0f0f0;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span style="font-size: 16px; font-weight: 500;">{{ pageTitle }}</span>
-          <a-space>
+          <a-space class="header-actions" :size="12">
             <NotificationCenter />
             <ThemeSwitcher />
             <a-dropdown v-if="authStore.user">
-              <a-space style="cursor: pointer;">
+              <a-space class="user-trigger" style="cursor: pointer;">
                 <a-avatar style="background-color: #1890ff;">
                   {{ authStore.user.username?.charAt(0)?.toUpperCase() || 'U' }}
                 </a-avatar>
@@ -120,5 +120,12 @@ function handleLogout() {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.header-actions,
+.user-trigger {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
 }
 </style>

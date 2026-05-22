@@ -82,6 +82,24 @@ export interface EdgeData {
   label?: string;
 }
 
+export type DynamicFormFieldType = 'input' | 'textarea' | 'number' | 'select' | 'date';
+
+export interface DynamicFormFieldOption {
+  label: string;
+  value: string | number;
+}
+
+export interface DynamicFormField {
+  key: string;
+  label: string;
+  type: DynamicFormFieldType;
+  required?: boolean;
+  placeholder?: string;
+  defaultValue?: any;
+  options?: DynamicFormFieldOption[];
+  description?: string;
+}
+
 export interface ProcessDefinition {
   id: string;
   name: string;
@@ -90,6 +108,12 @@ export interface ProcessDefinition {
   status: ProcessStatus;
   nodes: NodeData[];
   edges: EdgeData[];
+  formFields?: DynamicFormField[];
+  definition?: {
+    nodes?: NodeData[];
+    edges?: EdgeData[];
+    formFields?: DynamicFormField[];
+  };
   createdAt: number;
   updatedAt: number;
   createdBy: string;

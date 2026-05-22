@@ -18,3 +18,8 @@ export const login = async (ctx: Context) => {
   const result = await authService.login(username, password);
   successResponse(ctx, result, '登录成功');
 };
+
+export const me = async (ctx: Context) => {
+  const result = await authService.getCurrentUser(ctx.state.user);
+  successResponse(ctx, result);
+};

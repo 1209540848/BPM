@@ -2,6 +2,7 @@ import { hashPassword, comparePassword } from '../utils/password.util';
 import { generateToken } from '../utils/jwt.util';
 import prisma from '../config/database.config';
 import { User, JwtPayload } from '../types';
+import { getPermissionsByRole, normalizeRole, PermissionCode } from '../constants/permissions';
 
 export const register = async (data: {
   username: string;
@@ -57,6 +58,38 @@ export const login = async (
 
   const token = generateToken(user);
   const { password: _, ...userWithoutPassword } = user;
+  const role = normalizeRole(user.role, user.username);
 
-  return { token, user: userWithoutPassword };
+  return {
+    token,
+    user: {
+      ...userWithoutPassword,
+      role,
+    },
+  };
+};
+
+export const getCurrentUser = async (
+  payload: JwtPayload
+): Promise<{ user: Omit<User, 'password'>; role: string; permissions: PermissionCode[] }> => {
+  const user = await prisma.user.findUnique({
+    where: { id: payload.userId },
+  });
+
+  if (!user) {
+    throw new Error('用户不存在');
+  }
+
+  const { password: _, ...userWithoutPassword } = user;
+  const role = normalizeRole(user.role, user.username);
+  const permissions = getPermissionsByRole(role);
+
+  return {
+    user: {
+      ...userWithoutPassword,
+      role,
+    },
+    role,
+    permissions,
+  };
 };

@@ -11,24 +11,47 @@ export interface User {
   role: string;
 }
 
+export type PermissionCode =
+  | 'oa:dashboard:view'
+  | 'oa:process:read'
+  | 'oa:process:write'
+  | 'oa:process:publish'
+  | 'oa:process:delete'
+  | 'oa:instance:start'
+  | 'oa:instance:read'
+  | 'oa:instance:cancel'
+  | 'oa:task:read'
+  | 'oa:task:approve'
+  | 'oa:task:delegate'
+  | 'oa:demo:rebuild'
+  | 'oa:demo:verify';
+
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null);
   const token = ref<string | null>(localStorage.getItem('token'));
+  const permissions = ref<PermissionCode[]>([]);
+  const routesReady = ref(false);
   const loading = ref(false);
 
-  const isLoggedIn = computed(() => !!token.value && !!user.value);
+  const isLoggedIn = computed(() => !!token.value);
+
+  function setSession(data: any) {
+    token.value = data.token || token.value;
+    user.value = data.user;
+    permissions.value = data.permissions || permissions.value;
+
+    if (data.token) {
+      localStorage.setItem('token', data.token);
+      initializeWebSocket(data.token);
+    }
+  }
 
   async function login(username: string, password: string) {
     loading.value = true;
     try {
       const data: any = await authApi.login({ username, password });
-      token.value = data.token;
-      user.value = data.user;
-      localStorage.setItem('token', data.token);
-      
-      // 初始化 WebSocket 连接
-      initializeWebSocket(data.token);
-      
+      setSession(data);
+      await fetchMeAndPermissions();
       return data;
     } finally {
       loading.value = false;
@@ -43,19 +66,45 @@ export const useAuthStore = defineStore('auth', () => {
   }) {
     loading.value = true;
     try {
-      const result = await authApi.register(data);
-      return result;
+      return await authApi.register(data);
     } finally {
       loading.value = false;
     }
   }
 
+  async function fetchMeAndPermissions() {
+    if (!token.value) {
+      return null;
+    }
+
+    const data: any = await authApi.me();
+    user.value = data.user;
+    permissions.value = data.permissions || [];
+    return data;
+  }
+
+  function can(code: PermissionCode) {
+    return permissions.value.includes(code);
+  }
+
+  function canAny(codes: PermissionCode[]) {
+    return codes.some((code) => can(code));
+  }
+
+  function canAll(codes: PermissionCode[]) {
+    return codes.every((code) => can(code));
+  }
+
+  function setRoutesReady(value: boolean) {
+    routesReady.value = value;
+  }
+
   function logout() {
     token.value = null;
     user.value = null;
+    permissions.value = [];
+    routesReady.value = false;
     localStorage.removeItem('token');
-    
-    // 断开 WebSocket 连接
     disconnectWebSocket();
   }
 
@@ -69,10 +118,17 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     user,
     token,
+    permissions,
+    routesReady,
     loading,
     isLoggedIn,
     login,
     register,
+    fetchMeAndPermissions,
+    can,
+    canAny,
+    canAll,
+    setRoutesReady,
     logout,
     initAuth,
   };

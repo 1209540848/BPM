@@ -18,8 +18,8 @@ class RequestError extends Error {
   code?: number;
   response?: AxiosResponse;
 
-  constructor(message: string, code?: number, response?: AxiosResponse) {
-    super(message);
+  constructor(errorMessage: string, code?: number, response?: AxiosResponse) {
+    super(errorMessage);
     this.name = 'RequestError';
     this.code = code;
     this.response = response;
@@ -54,12 +54,8 @@ class HttpRequest {
     }
 
     const requestConfig = config as RequestConfig;
-    if (!requestConfig.retry) {
-      requestConfig.retry = 3;
-    }
-    if (!requestConfig.retryDelay) {
-      requestConfig.retryDelay = 1000;
-    }
+    requestConfig.retry = requestConfig.retry ?? 3;
+    requestConfig.retryDelay = requestConfig.retryDelay ?? 1000;
 
     return config;
   }
@@ -69,33 +65,49 @@ class HttpRequest {
   }
 
   private responseInterceptor<T>(response: AxiosResponse<ApiResponse<T>>): T {
-    const { code, message: msg, data } = response.data;
+    const { code, message: responseMessage, data } = response.data;
 
     if (code === 200) {
+      this.retryMap.delete(response.config.url || '');
       return data;
-    } else {
-      const error = new RequestError(msg || '请求失败', code, response);
-      if (!(response.config as RequestConfig).skipErrorHandler) {
-        this.handleError(error);
-      }
-      throw error;
     }
+
+    const error = new RequestError(responseMessage || '请求失败', code, response);
+    if (!(response.config as RequestConfig).skipErrorHandler) {
+      this.handleError(error);
+    }
+    throw error;
   }
 
   private async responseInterceptorError(error: any) {
     const config = error.config as RequestConfig;
+    const status = error.response?.status;
 
-    if (!config || !config.retry) {
+    if (!config || status === 401 || status === 403 || status === 404) {
+      const requestError = new RequestError(
+        error.response?.data?.message || error.message || '请求失败',
+        status,
+        error.response
+      );
+      if (!config?.skipErrorHandler) {
+        this.handleError(requestError);
+      }
+      return Promise.reject(requestError);
+    }
+
+    const shouldRetry = !status || status >= 500;
+    if (!shouldRetry || !config.retry) {
       return Promise.reject(error);
     }
 
-    const retryCount = this.retryMap.get(config.url || '') || 0;
+    const retryKey = `${config.method || 'get'}:${config.url || ''}`;
+    const retryCount = this.retryMap.get(retryKey) || 0;
 
     if (retryCount >= config.retry) {
-      this.retryMap.delete(config.url || '');
+      this.retryMap.delete(retryKey);
       const requestError = new RequestError(
         error.response?.data?.message || error.message || '请求失败',
-        error.response?.status,
+        status,
         error.response
       );
       if (!config.skipErrorHandler) {
@@ -104,7 +116,7 @@ class HttpRequest {
       return Promise.reject(requestError);
     }
 
-    this.retryMap.set(config.url || '', retryCount + 1);
+    this.retryMap.set(retryKey, retryCount + 1);
 
     const delay = config.retryDelay || 1000;
     await new Promise(resolve => setTimeout(resolve, delay));
